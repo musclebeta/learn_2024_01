@@ -31,7 +31,8 @@ class Dataset(torch.utils.data.Dataset):
         data = self.tokenizer.encode_plus(list(d1['text']))
         input_ids = data.data['input_ids']
         attention_mask = data.data['attention_mask']
-        target = [d1["target"][-1]["start"] + 1, d1["target"][-1]["end"] + 1]
+        # target = [d1["target"][-1]["start"] + 1, d1["target"][-1]["end"] + 1]
+        target = [[target_item["start"] + 1, target_item["end"] + 1] for target_item in d1["target"]]
         label = self.label2idx[d1["frame"]]
         sentence_id = d1["sentence_id"]
 

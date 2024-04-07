@@ -106,14 +106,18 @@ def eval(model, val_loader):
 
 
 def train(model, train_loader, val_loader):
+    # 训练模型
     param_optimizer = list(model.named_parameters())
+    # 优化器参数
     no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
+    # 不需要进行衰减的参数
     optimizer_grouped_parameters = [
         {'params': [p for n, p in param_optimizer if not any(
             nd in n for nd in no_decay)], 'weight_decay': 0.01},
         {'params': [p for n, p in param_optimizer if any(
             nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
+    # 优化器参数组
 
     # *******************  NoisyTune  ****************
 
@@ -128,23 +132,29 @@ def train(model, train_loader, val_loader):
 
     total_steps = int(len(train_loader) * args.num_train_epochs /
                       args.accumulate_gradients)
-
+    # 总训练步数
     optimizer = AdamW(optimizer_grouped_parameters,
                       lr=args.lr)
+    # 优化器
 
     # adv = FGM(bert_model) if args.with_adv_train else None
     global_step = 0
     best_acc = 0.0
     fgm = FGM(model)
+    # 训练过程
     for i_epoch in range(1, 1 + args.num_train_epochs):
         total_loss = 0.0
+        # 训练集
         iter_bar = tqdm(train_loader, total=len(train_loader), desc=f'epoch_{i_epoch} ')
+        # 进度条
         model.train()
+        # 训练模式
         for step, batch in enumerate(iter_bar):
             global_step += 1
 
             input_ids, attention_mask, target, labels, sentence_id = batch
-
+            # 准备数据
+            # 输入数据
             output = model(input_ids=input_ids, attention_mask=attention_mask, target=target, labels=labels, device=device)
 
             loss = output['loss']
@@ -164,12 +174,16 @@ def train(model, train_loader, val_loader):
             # fgm.restore()  # 恢复Embedding的参数
 
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2.0)
+            # 梯度裁剪
             if (step + 1) % args.accumulate_gradients == 0:
+                # 累计梯度
                 lr_this_step = args.lr * \
                                warmup_linear(global_step / total_steps,
                                              args.warmup_proportion)
+                # 线性调整学习率
                 for param_group in optimizer.param_groups:
                     param_group['lr'] = lr_this_step
+                # 优化器更新参数
                 optimizer.step()
                 optimizer.zero_grad()
                 global_step += 1
@@ -177,6 +191,7 @@ def train(model, train_loader, val_loader):
             # break
 
         acc = eval(model, val_loader)
+        # 验证集
 
         if acc > best_acc:
             print(f'saved! new best acc {acc}, ori_acc {best_acc}')
@@ -186,11 +201,12 @@ def train(model, train_loader, val_loader):
             torch.save(model_to_save.state_dict(), f'saves/model_task1_best.bin')
         else:
             print(f'current acc: {acc}')
-
+        # 保存模型
         # train_loader.dataset.gen_data()
 
 
 def load_pretrained_bert(bert_model, init_checkpoint):
+    # 加载预训练的bert模型
     if init_checkpoint is not None:
         state = torch.load(init_checkpoint, map_location='cpu')
         if 'model_bert_best' in init_checkpoint:
@@ -208,24 +224,32 @@ if __name__ == '__main__':
 
     tokenizer = BertTokenizer(vocab_file=args.vocab_file,
                               do_lower_case=True)
+    # 这里的tokenizer是bert的tokenizer，用于分词
 
     train_dataset = Dataset("./dataset/cfn-train.json",
                             "./dataset/frame_info.json",
                             tokenizer)
+    # 训练集
     dev_dataset = Dataset("./dataset/cfn-dev.json",
                           "./dataset/frame_info.json",
                           tokenizer)
+    # 验证集
 
     config = BertConfig.from_json_file(args.config_file)
+    # 这里的config是bert的config，用于构建模型
     # BertConfig.from_pretrained('hfl/chinese-bert-wwm-ext')
     config.num_labels = train_dataset.num_labels
+    # 这里的num_labels是标签的数量
     model = Model(config)
+    # 构建模型
     # load_pretrained_bert(model, args.init_checkpoint)
     state = torch.load(args.init_checkpoint, map_location='cpu')
+    # 加载预训练的bert模型
     msg = model.load_state_dict(state, strict=False)
+    # 加载预训练的bert模型的参数
     # model.load_state_dict(torch.load('', map_location='cpu'))
     model = model.to(device)
-
+    # 加载模型到device
     train_loader = DataLoader(
         batch_size=args.batch_size,
         dataset=train_dataset,
@@ -234,7 +258,7 @@ if __name__ == '__main__':
         collate_fn=partial(get_model_input, device=device),
         drop_last=True
     )
-
+    # 训练集的dataloader
     val_loader = DataLoader(
         batch_size=args.batch_size,
         dataset=dev_dataset,
@@ -243,4 +267,6 @@ if __name__ == '__main__':
         collate_fn=partial(get_model_input, device=device),
         drop_last=False
     )
+    # 验证集的dataloader
     train(model, train_loader, val_loader)
+    # 训练模型

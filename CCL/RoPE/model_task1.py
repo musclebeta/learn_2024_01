@@ -61,7 +61,14 @@ class Model(nn.Module):
         # logits:(batch_size, ent_type_size, seq_len, seq_len)
         logits = torch.einsum('bmhd,bnhd->bhmn', qw, kw)
         logits = logits / self.inner_dim ** 0.5
-        token_logits = torch.concat([logits[i][:, target[i][0], target[i][1]].unsqueeze(0) for i in range(len(target))], dim=0)
+        # ******************************************
+        # token_logits = torch.concat([logits[i][:, target[i][0], target[i][1]].unsqueeze(0) for i in range(len(target))], dim=0)
+        # ******************************************
+        selected_values = []
+        for i in range(len(target)):
+            value1 = logits[i][:, target[i][0], target[i][1]].unsqueeze(0)
+            selected_values.append(value1)
+        token_logits = torch.cat(selected_values, dim=0)
 
         if for_test:
             loss = None
