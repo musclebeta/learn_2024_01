@@ -64,11 +64,12 @@ class Model(nn.Module):
         # ******************************************
         # token_logits = torch.concat([logits[i][:, target[i][0], target[i][1]].unsqueeze(0) for i in range(len(target))], dim=0)
         # ******************************************
-        selected_values = []
-        for i in range(len(target)):
-            value1 = logits[i][:, target[i][0], target[i][1]].unsqueeze(0)
-            selected_values.append(value1)
-        token_logits = torch.cat(selected_values, dim=0)
+        token_logits = torch.cat([logits[i][:, target[i]["start"]:target[i]["end"]+1].unsqueeze(0) for i in range(len(target))], dim=0)
+        # selected_values = []
+        # for i in range(len(target)):
+        #     value1 = logits[i][:, target[i][0], target[i][1]].unsqueeze(0)
+        #     selected_values.append(value1)
+        # token_logits = torch.cat(selected_values, dim=0)
 
         if for_test:
             loss = None
